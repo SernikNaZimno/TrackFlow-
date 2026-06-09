@@ -1,0 +1,58 @@
+import amqp from 'amqplib'
+import * as crypto from 'crypto'
+
+let channel: any = null
+let connection: any = null
+
+export async function initRabbitMQ() {
+  try {
+    const rabbitUrl = process.env.RABBITMQ_URL || 'amqp://trackflow:trackflow@localhost:5672'
+    connection = await amqp.connect(rabbitUrl)
+    channel = await connection.createChannel()
+    
+    // Assert exchange i kolejki
+    await channel.assertExchange('trackflow.events', 'topic', { durable: true })
+    await channel.assertQueue('trackflow.clicks', { durable: true })
+    await channel.bindQueue('trackflow.clicks', 'trackflow.events', 'click.recorded')
+
+    console.log('RabbitMQ Publisher gotowy.')
+  } catch (error) {
+    console.error('Błąd połączenia z RabbitMQ Publisher:', error)
+  }
+}
+
+export function publishEvent(routingKey: string, payload: any) {
+  if (!channel) {
+    console.error('Błąd: Próba publikacji bez aktywnego kanału RabbitMQ')
+    return
+  }
+
+  const eventId = crypto.randomUUID()
+  const message = {
+    event_id: eventId,
+    event_type: routingKey,
+    version: '1.0',
+    timestamp: new Date().toISOString(),
+    payload
+  }
+
+  // Używamy setImmediate, aby nie blokować pętli zdarzeń/ścieżki response
+  setImmediate(() => {
+    try {
+      if(channel) {
+         channel.publish('trackflow.events', routingKey, Buffer.from(JSON.stringify(message)), {
+            persistent: true,
+            messageId: eventId,
+            contentType: 'application/json'
+         })
+      }
+    } catch (err) {
+      console.error('Błąd asynchronicznej publikacji do RabbitMQ:', err)
+    }
+  })
+}
+
+export async function closeRabbitMQ() {
+  if (channel) await channel.close()
+  if (connection) await connection.close()
+}

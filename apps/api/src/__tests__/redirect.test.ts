@@ -1,0 +1,82 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import supertest from 'supertest'
+import { buildApp } from '../app'
+import { prisma } from '../lib/prisma'
+import { redis } from '../plugins/redis'
+import * as bcrypt from 'bcrypt'
+
+const app = buildApp()
+
+describe('Redirect KRYTYCZNY (GET /:short_code)', () => {
+  let validLink: any
+  let expiredLink: any
+  let userId: string
+
+  beforeAll(async () => {
+    await app.ready()
+    const passwordHash = await bcrypt.hash('test1234', 10)
+    const user = await prisma.user.create({
+      data: { email: 'redirect@test.com', passwordHash, role: 'marketer' }
+    })
+    userId = user.id
+
+    validLink = await prisma.link.create({
+      data: {
+        shortCode: 'vA1iD',
+        originalUrl: 'https://valid.com',
+        createdBy: user.id
+      }
+    })
+
+    expiredLink = await prisma.link.create({
+      data: {
+        shortCode: 'eXp1R',
+        originalUrl: 'https://expired.com',
+        createdBy: user.id,
+        expiresAt: new Date(Date.now() - 86400000) // Wczoraj
+      }
+    })
+  })
+
+  afterAll(async () => {
+    await prisma.link.deleteMany()
+    await prisma.user.deleteMany()
+    await redis.quit() // Wyczyszczenie socketów
+    await app.close()
+    await prisma.$disconnect()
+  })
+
+  it('MISS: Powinno pobrać z PG i zrobić 302, a potem zapisać do Redis', async () => {
+    await redis.del(`link:${validLink.shortCode}`) // Wymuszamy MISS
+
+    const response = await supertest(app.server).get(`/${validLink.shortCode}`)
+    expect(response.status).toBe(302)
+    expect(response.header.location).toBe(validLink.originalUrl)
+
+    const cache = await redis.get(`link:${validLink.shortCode}`)
+    expect(cache).not.toBeNull()
+  })
+
+  it('HIT: Powinno natychmiast zwrócić 302 z Redis', async () => {
+    const start = performance.now()
+    const response = await supertest(app.server).get(`/${validLink.shortCode}`)
+    const end = performance.now()
+
+    expect(response.status).toBe(302)
+    expect(response.header.location).toBe(validLink.originalUrl)
+    // Czas powinien być ultra krótki (w teście lokalnym na RAM cache <5ms)
+    expect(end - start).toBeLessThan(50)
+  })
+
+  it('EXPIRED: Wygasły link zwraca 404', async () => {
+    const response = await supertest(app.server).get(`/${expiredLink.shortCode}`)
+    expect(response.status).toBe(404)
+    expect(response.body.code).toBe('NOT_FOUND')
+  })
+
+  it('NOT FOUND: Błędny short_code zwraca 404', async () => {
+    const response = await supertest(app.server).get(`/noEx1st`)
+    expect(response.status).toBe(404)
+    expect(response.body.code).toBe('NOT_FOUND')
+  })
+})

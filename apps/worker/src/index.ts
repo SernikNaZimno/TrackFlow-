@@ -2,6 +2,8 @@ import amqp from 'amqplib'
 import { prisma } from './lib/prisma'
 import { handleClickRecorded } from './consumers/click.consumer'
 import { handleNotificationSend } from './consumers/notification.consumer'
+import { initWeeklyReportCron } from './cron/weekly-report.cron'
+import { initInactivityAlertCron } from './cron/inactivity-alert.cron' // Nowy import
 
 async function start() {
   console.log('Uruchamianie Workera TrackFlow...')
@@ -12,7 +14,8 @@ async function start() {
     const channel = await connection.createChannel()
     
     await channel.assertExchange('trackflow.events', 'topic', { durable: true })
-    
+    initWeeklyReportCron(channel)
+    initInactivityAlertCron(channel)
     // 1. Kolejka kliknięć (Z POPRZEDNIEGO KROKU)
     await channel.assertQueue('trackflow.clicks', { durable: true })
     await channel.bindQueue('trackflow.clicks', 'trackflow.events', 'click.recorded')

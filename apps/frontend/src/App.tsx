@@ -1,9 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { ReactNode } from 'react'; // <--- Dodaj to
+import LoginPage from './pages/LoginPage'; // Importujemy nowy komponent
 
-// Zamiana JSX.Element na ReactNode
-function ProtectedRoute({ children }: { children: ReactNode }) {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   return user ? children : <Navigate to="/login" />;
 }
@@ -13,10 +12,10 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<div>Strona Logowania</div>} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={
             <ProtectedRoute>
-              <div>Dashboard (Tu będzie lista linków)</div>
+              <div>Dashboard (Tu za chwilę zrobimy listę Twoich linków!)</div>
             </ProtectedRoute>
           } />
         </Routes>

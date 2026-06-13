@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import LoginPage from './pages/LoginPage'; // Importujemy nowy komponent
+import LoginPage from './pages/LoginPage';
+import DashboardPage from './pages/DashboardPage';
+import AnalyticsPage from './pages/AnalyticsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -15,7 +17,12 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={
             <ProtectedRoute>
-              <div>Dashboard (Tu za chwilę zrobimy listę Twoich linków!)</div>
+              <DashboardPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/analytics/:id" element={
+            <ProtectedRoute>
+              <AnalyticsPage />
             </ProtectedRoute>
           } />
         </Routes>

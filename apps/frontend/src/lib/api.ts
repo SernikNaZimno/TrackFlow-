@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-// Używamy portu 3333, na którym działa Twoje API Fastify
+// Używamy portu 3000, na którym działa Twoje API Fastify
 export const api = axios.create({
-  baseURL: 'http://localhost:3333', 
+  baseURL: 'http://localhost:3000', 
 });
 
 // Interceptor: automatycznie wstrzykuje token JWT do nagłówka

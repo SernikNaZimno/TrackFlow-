@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import cors from '@fastify/cors'
 import jwtPlugin from './plugins/jwt'
 import authRoutes from './routes/auth'
 import linksRoutes from './routes/links'
@@ -13,6 +14,7 @@ export function buildApp() {
   })
 
   // Pluginy
+  app.register(cors, { origin: true })
   app.register(jwtPlugin)
 
   // Ścieżki
